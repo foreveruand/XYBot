@@ -1,0 +1,8 @@
+# 是否开启私聊gpt
+enable_bilichat: True # 可为 True 或者 False
+
+bilichat_neterror_retry: 30
+bilichat_dynamic: False
+bilichat_basic_info: True
+bilichat_basic_info_style: "bbot_default"
+bilichat_official_summary: True

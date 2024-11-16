@@ -57,6 +57,8 @@ class XYBot:
             await self.system_message_handler(bot, recv)
         elif message_type == 47:  # 表情消息
             await self.emoji_message_handler(recv)
+        elif message_type == 49: #链接等消息
+            await self.link_message_handler(bot, recv)
         else:  # 其他消息，type不存在或者还未知干啥用的
             logger.info(f"[其他消息] {recv}")
 
@@ -158,6 +160,15 @@ class XYBot:
                 for plugin in plugin_manager.plugins["join_group"].values():
                     await asyncio.create_task(plugin.run(bot, recv))
                 return
+    async def link_message_handler(self, bot: client.Wcf, recv: XYBotWxMsg) -> None:
+        logger.info(f"[收到链接消息]:{recv}")
+
+        if not self.ignorance_check(recv):  # 屏蔽检查
+            return
+
+        # 指令处理
+        for plugin in plugin_manager.plugins["link"].values():
+            await asyncio.create_task(plugin.run(bot, recv))
 
     async def emoji_message_handler(self, recv) -> None:
         logger.info(f"[收到表情消息]{recv}")
