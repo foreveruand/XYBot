@@ -168,3 +168,7 @@ gomoku_board.psd
 
 debugger.py
 pywxdll_test.py
+resources/eat_what/greetings.json
+resources/eat_what/eating.json
+utils/bilichat/config.py
+config/config.py
