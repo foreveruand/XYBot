@@ -1,0 +1,6 @@
+# 是否开启私聊gpt
+enable_private_handle: True # 可为 True 或者 False
+
+command_keywords: "handle"
+
+game_running: False

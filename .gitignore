@@ -172,3 +172,4 @@ resources/eat_what/greetings.json
 resources/eat_what/eating.json
 utils/bilichat/config.py
 config/config.py
+resources/cache/*

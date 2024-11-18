@@ -1,5 +1,9 @@
+---
+### 2024.11.18 更新
+[nonebot-plugin-handle](https://github.com/noneplugin/nonebot-plugin-handle) 抄了过来
+---
 从 [noenbot-plugin-bilichat](https://github.com/Well2333/nonebot-plugin-bilichat) ~~抄袭~~ 借鉴了一个解析bilibili链接的插件，目前只能返回视频的官方的AI总结
-##utils/bilichat/config.sample.py需要修改为config.py并配置，当然不配置可能也行##
+**utils/bilichat/config.sample.py需要修改为config.py并配置，当然不配置可能也行**
 从 [nonebot_plugin_what2eat](https://github.com/MinatoAquaCrews/nonebot_plugin_what2eat) 抄了部分功能，包括吃什么和每日提醒，添加菜单（无权限限制）
 
 # 感谢各位大佬写的bot和各种插件
