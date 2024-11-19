@@ -50,8 +50,7 @@ class handle(PluginInterface):
             msg = "猜成语超时，游戏结束。"
             if len(game.guessed_idiom) >= 1:
                 msg += f"\n{str(game.result)}"
-            await bot.send_text(f"{msg}", room_id)
-
+            await self.send_friend_or_group(bot, recv, msg)
 
     def set_timeout(self, bot: client.Wcf, room_id: str, timeout: float = 300):
         logger.debug(f"handle :设置超时时间")
@@ -68,7 +67,7 @@ class handle(PluginInterface):
         if not self.enable_private_handle:
             return  # 如果不开启私聊，不处理
         elif not recv.from_group():
-            return  # 如果是群聊消息，不处理
+            return  # 如果非群聊消息，不处理
         logger.debug(f"handle 处理消息:{recv.content}")
         try:
             recv.content = re.split(" |\u2005", recv.content)  # 拆分消息
@@ -100,14 +99,15 @@ class handle(PluginInterface):
             with open(save_path, 'wb') as f:
                 f.write(raw.getvalue())
             await self.send_friend_or_group(bot, recv, msg)
-            await self.send_friend_or_group_image(bot, recv, save_path)
+            # await self.send_friend_or_group_image(bot, recv, save_path)
         elif game:
             if recv.content[0]=='结束':
                 self.stop_game(room_id)
                 await self.send_friend_or_group(bot, recv, "猜成语结束")
                 return
             if recv.content[0]=='提示':
-                save_path = get_latest_file("resources/cache/handle_*")
+                save_path = os.path.abspath(get_latest_file("resources/cache/handle_*"))
+                # logger.debug(f"最新文件地址:{save_path}")
                 await self.send_friend_or_group_image(bot, recv, save_path)
                 return
             if not (re.fullmatch(r'^[\u4e00-\u9fa5]{4}$', recv.content[0])):
@@ -184,4 +184,5 @@ def get_latest_file(filename: str):
     
     # 找到最新的文件
     latest_file = max(files, key=os.path.getmtime)
-    return latest_file
+    return os.path.normpath(latest_file)
+    # return latest_file
