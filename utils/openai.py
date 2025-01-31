@@ -137,7 +137,6 @@ async def chatgpt(wxid: str, message: str):  # 这个函数请求了openai的api
         # Process the model's response
         response_message = response.choices[0].message
         request_content = compose_gpt_dialogue_request_content(wxid, message)
-        request_content.append(response_message)
         # Handle function calls
         if response_message.tool_calls:
             for tool_call in response_message.tool_calls:
@@ -145,12 +144,14 @@ async def chatgpt(wxid: str, message: str):  # 这个函数请求了openai的api
                     function_args = json.loads(tool_call.function.arguments)
                     web_response = bing_search(function_args["query"])
                     # logger.info(f"get web response:{web_response}")
+                    request_content.append({"role": "assistant", 'tool_calls': [{'id': tool_call.id, 'function': {'arguments': function_args["query"], 'name':  "web_search"}, 'type': 'function'}]})
                     request_content.append({
                         "tool_call_id": tool_call.id,
                         "role": "tool",
                         "name": "web_search",
                         "content": json.dumps(web_response),
                     })
+        logger.info(f"final requests:{request_content}")
         chat_completion = await client.chat.completions.create(
             messages=request_content,
             model=GPT_VERSION,
