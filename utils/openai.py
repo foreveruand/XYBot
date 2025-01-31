@@ -1,6 +1,7 @@
 from openai import AsyncOpenAI,AsyncAzureOpenAI
 from config.config import *
 from utils.database import BotDatabase
+from typing import Dict
 import yaml
 import base64
 from mimetypes import guess_type
@@ -24,7 +25,18 @@ def bing_search(query):
     try:
         response = requests.get(endpoint, headers=headers, params=params)
         response.raise_for_status()
-        return response.json()
+        results = response.json()
+        results = results['webPages']['value'][:2]
+        if results is None or len(results) == 0:
+            return {"Result": "No good Bing Search Result was found"}
+
+        def to_metadata(result: Dict) -> Dict[str, str]:
+            return {
+                "snippet": result["snippet"],
+                "link": result["url"],
+            }  
+        # return {"Result": "No good Bing Search Result was found"}
+        return {"result": [to_metadata(result) for result in results]}
     except Exception as ex:
         raise ex
     
@@ -124,31 +136,23 @@ async def chatgpt(wxid: str, message: str):  # 这个函数请求了openai的api
         )
         # Process the model's response
         response_message = response.choices[0].message
-        logger.info(f"response_message: {response_message}")
         request_content = compose_gpt_dialogue_request_content(wxid, message)
-        request_function = request_content
-        request_function.append(response_message)
+        request_content.append(response_message)
         # Handle function calls
         if response_message.tool_calls:
             for tool_call in response_message.tool_calls:
                 if tool_call.function.name == "web_search":
-                    # logger.info(f"found function calls")
                     function_args = json.loads(tool_call.function.arguments)
-                    # web_response = bing_search(function_args["query"])
-                    search_results = bing_search(function_args["query"])
-                    # top_result = search_results['webPages']['value'][0]['snippet']
-                    top_results = [result['snippet'] for result in search_results['webPages']['value'][:2]]
-                    web_response = ''
-                    for i, result in enumerate(top_results):
-                        web_response += f"{i + 1}. {result}\n"
-                    request_function.append({
+                    web_response = bing_search(function_args["query"])
+                    # logger.info(f"get web response:{web_response}")
+                    request_content.append({
                         "tool_call_id": tool_call.id,
                         "role": "tool",
                         "name": "web_search",
-                        "content": web_response,
+                        "content": json.dumps(web_response),
                     })
         chat_completion = await client.chat.completions.create(
-            messages=request_function,
+            messages=request_content,
             model=GPT_VERSION,
             temperature=TEMPERATURE,
             max_tokens=MAX_TOKENS,
@@ -161,7 +165,6 @@ async def chatgpt(wxid: str, message: str):  # 这个函数请求了openai的api
                                                 chat_completion.choices[0].message.content)  # 保存对话请求与回答内容
         except Exception as e:
             logger.error(f"save failed with error {e}")
-            pass
         return True, chat_completion.choices[0].message.content  # 返回对话回答内容
     except Exception as error:
         return False, error
@@ -205,6 +208,8 @@ async def chatgpt_img(wxid:str, image_path: str, message: str = "Describe this p
         return False, error
 
 def save_gpt_dialogue_request_content(wxid: str, request_content: list, gpt_response: str) -> None:
+    request_content = [msg for msg in request_content if isinstance(msg, dict) ]
+    logger.debug(f"save request:{str(request_content)};\nresponse:{gpt_response}")
     request_content.append({"role": "assistant", "content": gpt_response})  # 将gpt回答加入到api请求内容
     request_content = request_content[DIALOGUE_COUNT * -2:]  # 将列表切片以符合指定的对话轮数，乘-2是因为一轮对话包含了1个请求和1个答复
 
