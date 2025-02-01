@@ -6,6 +6,7 @@ import yaml
 import base64
 from mimetypes import guess_type
 from loguru import logger
+from openai_plugin_manager import plugin_manager as openai_function_manager
 import requests
 import json
 
@@ -97,29 +98,10 @@ async def chatgpt(wxid: str, message: str):  # 这个函数请求了openai的api
         logger.info(f"send request to deepseek: {_openai_provider} with model {_model} to {CONFIG.DEEPSEEK_API_BASE}")
     try:
         if _openai_provider == "azure":
-            tools = [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "web_search",
-                        "description": "Execute a web search for the given query and return a list of results",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "query": {
-                                    "type": "string",
-                                    "description": "the user query",
-                                },
-                            },
-                            "required": ["query"],
-                        },
-                    }
-                }
-            ]
             response = await client.chat.completions.create(
                 model=_model,
                 messages=[{"role":"user","content":message}],
-                tools=tools,
+                tools=openai_function_manager.get_functions_specs('azure'),
                 tool_choice="auto",
             )
             # Process the model's response
@@ -128,17 +110,13 @@ async def chatgpt(wxid: str, message: str):  # 这个函数请求了openai的api
             # Handle function calls
             if response_message.tool_calls:
                 for tool_call in response_message.tool_calls:
-                    if tool_call.function.name == "web_search":
+                    if tool_call.function.name == {"web_search","get_current_weather","get_forecast_weather"}:
                         function_args = json.loads(tool_call.function.arguments)
+                        function_response = await openai_function_manager.call_function(tool_call.function.name, arguments)
                         web_response = bing_search(function_args["query"])
-                        # logger.info(f"get web response:{web_response}")
-                        request_content.append({"role": "assistant", 'tool_calls': [{'id': tool_call.id, 'function': {'arguments': function_args["query"], 'name':  "web_search"}, 'type': 'function'}]})
-                        request_content.append({
-                            "tool_call_id": tool_call.id,
-                            "role": "tool",
-                            "name": "web_search",
-                            "content": json.dumps(web_response),
-                        })
+                        # logger.info(f"get web response:{web_response}") (request_content, function_name, content,tool_call_id=None,arguments=None)
+                        request_content = add_function_call_to_request(request_content=request_content, 
+                            function_name=tool_call.function.name,content=function_response,tool_call_id=tool_call.id,arguments=function_args["query"])
         elif _openai_provider == "openai":
             function = {
                         "name": "web_search",
@@ -240,6 +218,26 @@ def save_gpt_dialogue_request_content(wxid: str, request_content: list, gpt_resp
     json_data = {"data": request_content}  # 构成保存需要的json数据
     db=BotDatabase()
     db.save_private_gpt_data(wxid, json_data)  # 保存到数据库中
+
+def add_function_call_to_request(request_content, function_name, content,tool_call_id=None,arguments=None):
+    """
+    Adds a function call to the request
+    """
+    if _openai_provider == "azure":
+        request_content.append({"role": "assistant", 'tool_calls': [{'id': tool_call.id, 'function': {'arguments': arguments, 'name':  function_name}, 'type': 'function'}]})
+        request_content.append({
+            "tool_call_id": tool_call.id,
+            "role": "tool",
+            "name": function_name,
+            "content": content,
+        })
+    else:
+        request_content.append({
+            "role": "function",
+            "name": function_name,
+            "content": content,
+        })
+    return request_content
 
 def senstitive_word_check(message):  # 检查敏感词
     sensitive_words_path = "sensitive_words.yml"  # 加载敏感词yml
