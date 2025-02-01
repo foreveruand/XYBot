@@ -63,7 +63,7 @@ class bilichat(PluginInterface):
         self.db = BotDatabase()
         
     async def _bili_check(self, bot: client.Wcf, message: str, type: int) -> str:
-        logger.debug(f"待处理消息{message}")
+        # logger.debug(f"待处理消息{message}")
         out_message = ""
         # if Reply in msg and (
         #     (plugin_config.bilichat_enable_self and str(event.get_user_id()) == str(bot.self_id)) or event.is_tome()
@@ -190,7 +190,7 @@ class bilichat(PluginInterface):
         roomid = recv.roomid
         recv.content = re.split(" |\u2005", recv.content) # 拆分消息    
         message = " ".join(recv.content)
-        logger.debug(f"bilichat 处理消息:{message}")
+        # logger.debug(f"bilichat 处理消息:{message}")
         out_message = await self._bili_check(bot, message, recv.type)
         if out_message:
             bot.send_text(out_message, roomid)

@@ -129,6 +129,27 @@ class eat_what(PluginInterface):
         save_json(self._eating_json, self._eating)
         return msg
 
+    def remove_group_food(self,uid: str, gid: str, new_food: str):
+        '''
+            从群菜单移除
+        '''
+        msg = ""
+        self._eating = load_json(self._eating_json)
+        self._init_data(gid, uid)
+        status, _ = self._is_food_exists(
+            new_food, SearchLoc.IN_GLOBAL, gid)  # new food may include cq
+
+        if status == FoodLoc.IN_GROUP:
+            self._eating["group_food"][gid].remove(new_food)
+            msg = f"已从群特色菜单中移除~"
+        else:
+            # If image included, save it, return the path in string
+            # self._eating["group_food"][gid].append(new_food)
+            msg = f"{new_food}不在群特色菜单~"
+
+        save_json(self._eating_json, self._eating)
+        return msg
+
     async def run(self, bot: client.Wcf, recv: XYBotWxMsg):
         recv.content = re.split(" |\u2005", recv.content)  # 拆分消息
         uid  = recv.sender
@@ -146,6 +167,16 @@ class eat_what(PluginInterface):
                 else:
                     msg = self.add_group_food(uid,gid,recv.content[1])
                     logger.info("添加群菜单")
+            elif recv.content[0] == "删除群菜单":
+                if len(recv.content) < 2:
+                    msg ="还没输入你要删除的菜品呢~"
+                    logger.info("还没输入你要删除的菜品呢")
+                elif len(recv.content) > 2:
+                    msg ="删除菜品参数错误~"
+                    logger.info(f"删除菜品参数错误，处理指令：{command}")
+                else:
+                    msg = self.remove_group_food(uid,gid,recv.content[1])
+                    logger.info("删除群菜单")
             else :
                 msg = self.get_eat(gid,uid)
         else:

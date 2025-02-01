@@ -67,7 +67,11 @@ class eating_remind(PlansInterface):
         loop.create_task(self.do_greeting(bot,meal))
 
     def run(self, bot: client.Wcf):
-        schedule.every().day.at("07:00", tz=self.timezone).do(self.job_async, bot,Meals.BREAKFAST)
-        schedule.every().day.at("11:30", tz=self.timezone).do(self.job_async, bot,Meals.LUNCH)
-        schedule.every().day.at("17:30", tz=self.timezone).do(self.job_async, bot,Meals.DINNER)
+        for day in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']:
+            getattr(schedule.every(), day).at("08:00", tz=self.timezone).do(self.job_async, bot,Meals.BREAKFAST)
+            getattr(schedule.every(), day).at("12:00", tz=self.timezone).do(self.job_async, bot,Meals.LUNCH)
+            getattr(schedule.every(), day).at("18:00", tz=self.timezone).do(self.job_async, bot,Meals.DINNER)
+            # schedule.every().day.at("08:00", tz=self.timezone).do(self.job_async, bot,Meals.BREAKFAST)
+            # schedule.every().day.at("12:00", tz=self.timezone).do(self.job_async, bot,Meals.LUNCH)
+            # schedule.every().day.at("18:00", tz=self.timezone).do(self.job_async, bot,Meals.DINNER)
         schedule.every().day.at("03:00", tz=self.timezone).do(self.reset_count)

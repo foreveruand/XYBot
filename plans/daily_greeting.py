@@ -22,7 +22,7 @@ class daily_greeting(PlansInterface):
             main_config = yaml.safe_load(f.read())
 
         self.timezone = main_config["timezone"]  # 时区
-
+        self.greeting_list = main_config["greeting_list"]
     async def job(self, bot: client.Wcf):
         week_names = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
 
@@ -36,8 +36,9 @@ class daily_greeting(PlansInterface):
 
         contact_list = bot.get_contacts()
         for contact in contact_list:
-            if str(contact.get("wxid")).endswith("@chatroom"):  # 是一个群聊
-                # bot.send_text(message, contact.get("wxid"))
+            # if str(contact.get("wxid")).endswith("@chatroom"):  # 是一个群聊
+            if str(contact.get("wxid")) in self.greeting_list:
+                bot.send_text(message, contact.get("wxid"))
                 logger.info(f"[发送@信息]{message}| [发送到] {contact.get('wxid')}")
 
     @staticmethod
@@ -64,4 +65,4 @@ class daily_greeting(PlansInterface):
         loop.create_task(self.job(bot))
 
     def run(self, bot: client.Wcf):
-        schedule.every().day.at("07:00", tz=self.timezone).do(self.job_async, bot)
+        schedule.every().day.at("08:00", tz=self.timezone).do(self.job_async, bot)

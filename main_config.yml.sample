@@ -7,11 +7,11 @@ bot_version: "v2.0.0"
 ip: 127.0.0.1
 port: 5555
 
-admins: [ ]
+admins: [""]
 
 command_prefix: "" #如果需要前缀，则必须为一个字符。如果不需要前缀可设置为空，即 ""。
 
-excluded_plugins: [ "" ]
+excluded_plugins: [ ]
 
 timezone: "Asia/Shanghai"
 
@@ -23,7 +23,7 @@ mode: "none" # 可以是 黑名单blacklist 白名单whitelist 无none
 # 请填入群号或者wxid
 blacklist: [ ]
 whitelist: [ ]
-
+greeting_list: [ ]
 # ------------------------------------------------------------------------------ #
 # 全局chatgpt设置，插件使用到，私聊gpt也使用到
 
@@ -31,3 +31,4 @@ whitelist: [ ]
 openai_api_base: ""
 #ChatGPT API的Key
 openai_api_key: ""
+openai_provider: ""
