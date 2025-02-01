@@ -27,7 +27,7 @@ from wcferry_helper import XYBotWxMsg
 
 games: dict[str, Handle] = {}
 timers: dict[str, TimerHandle] = {}
-
+last_hint = 0
 class handle(PluginInterface):
     def __init__(self):
         config_path = "plugins/text/handle.yml"
@@ -42,7 +42,7 @@ class handle(PluginInterface):
         games.pop(room_id, None)
 
 
-    async def stop_game_timeout(self, bot: client.Wcf, room_id: str):
+    async def stop_game_timeout(self, bot: client.Wcf, recv: XYBotWxMsg ,room_id: str):
         logger.debug(f"handle :超时")
         game = games.get(room_id, None)
         self.stop_game(room_id)
@@ -52,14 +52,14 @@ class handle(PluginInterface):
                 msg += f"\n{str(game.result)}"
             await self.send_friend_or_group(bot, recv, msg)
 
-    def set_timeout(self, bot: client.Wcf, room_id: str, timeout: float = 300):
+    def set_timeout(self, bot: client.Wcf, room_id: str, recv: XYBotWxMsg ,timeout: float = 300):
         logger.debug(f"handle :设置超时时间")
         if timer := timers.get(room_id, None):
             timer.cancel()
         loop = asyncio.get_running_loop()
         logger.debug(f"handle :开始计时")
         timer = loop.call_later(
-            timeout, lambda: asyncio.ensure_future(self.stop_game_timeout(bot, room_id))
+            timeout, lambda: asyncio.ensure_future(self.stop_game_timeout(bot, recv, room_id))
         )
         timers[room_id] = timer
 
@@ -90,7 +90,7 @@ class handle(PluginInterface):
             game = Handle(idiom, explanation, strict=is_strict)
             # logger.debug("handle: 保存游戏")
             games[room_id] = game
-            self.set_timeout(bot, room_id, 300.0)
+            self.set_timeout(bot, room_id, recv, 300.0)
 
             # logger.debug("handle: 发送消息")
             msg = f"你有{game.times}次机会猜一个四字成语，"+ ("发送有效成语以参与游戏。" if is_strict else "发送任意四字词语以参与游戏。")
@@ -106,15 +106,28 @@ class handle(PluginInterface):
                 await self.send_friend_or_group(bot, recv, "猜成语结束")
                 return
             if recv.content[0]=='提示':
-                save_path = os.path.abspath(get_latest_file("resources/cache/handle_*"))
-                # logger.debug(f"最新文件地址:{save_path}")
-                await self.send_friend_or_group_image(bot, recv, save_path)
+                global last_hint
+                if time.time() - last_hint >= 3:
+                    time_change=time.time() - last_hint
+                    logger.info(f"当前时间{time.time()},距离上次提示时间{last_hint}为{time_change}")
+                    last_hint = time.time()
+                    # self.set_timeout(bot, room_id, recv)
+                    raw=await run_sync(game.draw_hint)()
+                    save_path = os.path.abspath(f"resources/cache/handle_{time.time_ns()}.png")
+                    with open(save_path, 'wb') as f:
+                        f.write(raw.getvalue())
+                    await self.send_friend_or_group_image(bot, recv, save_path)
+                else:
+                    logger.info(f"距离上次提示时间{last_hint}过短，忽略")
+                # save_path = os.path.abspath(get_latest_file("resources/cache/handle_*"))
+                # # logger.debug(f"最新文件地址:{save_path}")
+                # await self.send_friend_or_group_image(bot, recv, save_path)
                 return
             if not (re.fullmatch(r'^[\u4e00-\u9fa5]{4}$', recv.content[0])):
                 logger.debug("非四字词语，跳过")
                 return
 
-            self.set_timeout(bot, room_id, 300.0)
+            self.set_timeout(bot, room_id, recv, 300.0)
 
             # idiom = str(matched["idiom"])
             idiom = "".join(recv.content[0])
@@ -132,7 +145,11 @@ class handle(PluginInterface):
                 await self.send_friend_or_group_image(bot, recv, save_path)
 
             elif result == GuessResult.DUPLICATE:
-                await self.send_friend_or_group( bot, recv, "你已经猜过这个成语了呢")
+                return
+                # save_path = os.path.abspath(get_latest_file("resources/cache/handle_*"))
+                # # logger.debug(f"最新文件地址:{save_path}")
+                # await self.send_friend_or_group_image(bot, recv, save_path)
+                # await self.send_friend_or_group( bot, recv, "你已经猜过这个成语了呢")
 
             elif result == GuessResult.ILLEGAL:
                 await self.send_friend_or_group( bot, recv, f"你确定“{idiom}”是个成语吗？")

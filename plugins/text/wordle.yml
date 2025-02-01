@@ -1,0 +1,6 @@
+# 是否开启私聊gpt
+enable_private_wordle: True # 可为 True 或者 False
+
+command_keywords: "wordle"
+
+game_running: False
