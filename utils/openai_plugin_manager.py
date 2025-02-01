@@ -7,7 +7,7 @@ import yaml
 # from openai_plugin.ddg_image_search import DDGImageSearchPlugin
 # from openai_plugin.spotify import SpotifyPlugin
 # from openai_plugin.crypto import CryptoPlugin
-# from openai_plugin.weather import WeatherPlugin
+from .openai_plugin.weather import WeatherPlugin
 # from openai_plugin.ddg_web_search import DDGWebSearchPlugin
 from .openai_plugin.bing_web_search import BINGWebSearchPlugin
 # from openai_plugin.wolfram_alpha import WolframAlphaPlugin
@@ -29,7 +29,7 @@ class OpenAIPluginManager:
         enabled_plugins = config["openai_functions"]
         plugin_mapping = {
             # 'wolfram': WolframAlphaPlugin,
-            # 'weather': WeatherPlugin,
+            'weather': WeatherPlugin,
             # 'crypto': CryptoPlugin,
             # 'ddg_web_search': DDGWebSearchPlugin,
             # 'ddg_image_search': DDGImageSearchPlugin,

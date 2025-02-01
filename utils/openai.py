@@ -30,39 +30,6 @@ def update_config(provider, model):
     with open(file_path, 'w') as file:    
         file.writelines(lines)
 
-def bing_search(query):
-    subscription_key = CONFIG.BING_API_KEY
-    # search_url = 
-    # headers = {"Ocp-Apim-Subscription-Key": subscription_key}
-    # params = {"q": query, "textDecorations": True, "textFormat": "HTML"}
-    # response = requests.get(search_url, headers=headers, params=params)
-    # response.raise_for_status()
-
-    endpoint = "https://api.bing.microsoft.com" + "/v7.0/search"
-    # Construct a request
-    mkt = 'zh-CN'
-    params = { 'q': query, 'mkt': mkt }
-    headers = { 'Ocp-Apim-Subscription-Key': subscription_key }
-    # Call the API
-    try:
-        response = requests.get(endpoint, headers=headers, params=params)
-        response.raise_for_status()
-        results = response.json()
-        results = results['webPages']['value'][:2]
-        if results is None or len(results) == 0:
-            return {"Result": "No good Bing Search Result was found"}
-
-        def to_metadata(result: Dict) -> Dict[str, str]:
-            return {
-                "snippet": result["snippet"],
-                "link": result["url"],
-            }  
-        # return {"Result": "No good Bing Search Result was found"}
-        return {"result": [to_metadata(result) for result in results]}
-    except Exception as ex:
-        raise ex
-    
-
 def compose_gpt_dialogue_request_content(wxid: str, new_message: str) -> list:
     db = BotDatabase()
     json_data = db.get_private_gpt_data(wxid)  # 从数据库获得到之前的对话
@@ -70,9 +37,9 @@ def compose_gpt_dialogue_request_content(wxid: str, new_message: str) -> list:
     if not json_data or "data" not in json_data.keys():  # 如果没有对话数据，则初始化
         init_data = {"data": []}
         json_data = init_data
-
-    previous_dialogue = json_data['data'][CONFIG.DIALOGUE_COUNT * -2:]  # 获取指定轮数的对话，乘-2是因为一轮对话包含了1个请求和1个答复
     request_content = [{"role": "system", "content": "Please try to keep your response concise, ideally within 50 words."}]
+    
+    previous_dialogue = json_data['data'][CONFIG.DIALOGUE_COUNT * -2:]  # 获取指定轮数的对话，乘-2是因为一轮对话包含了1个请求和1个答复
     request_content += previous_dialogue  # 将之前的对话加入到api请求内容中
 
     request_content.append({"role": "user", "content": new_message})  # 将用户新的问题加入api请求内容
@@ -87,7 +54,6 @@ async def chatgpt(wxid: str, message: str):  # 这个函数请求了openai的api
             azure_endpoint=CONFIG.OPENAI_API_BASE,
             api_version="2024-07-01-preview",
         )
-        logger.info(f"send request to azure: {_openai_provider} with model {_model}")
     elif _openai_provider == "workers":
         client = AsyncOpenAI(
             api_key= CONFIG.CLOUDFLARE_API_KEY,
@@ -95,7 +61,6 @@ async def chatgpt(wxid: str, message: str):  # 这个函数请求了openai的api
         )
     else :
         client = AsyncOpenAI(api_key=CONFIG.DEEPSEEK_API_KEY, base_url=CONFIG.DEEPSEEK_API_BASE)
-        logger.info(f"send request to deepseek: {_openai_provider} with model {_model} to {CONFIG.DEEPSEEK_API_BASE}")
     try:
         if _openai_provider == "azure":
             response = await client.chat.completions.create(
@@ -104,38 +69,24 @@ async def chatgpt(wxid: str, message: str):  # 这个函数请求了openai的api
                 tools=openai_function_manager.get_functions_specs('azure'),
                 tool_choice="auto",
             )
+            # logger.info(f"send request with tool:{openai_function_manager.get_functions_specs('azure')}")
             # Process the model's response
             response_message = response.choices[0].message
             request_content = compose_gpt_dialogue_request_content(wxid, message)
             # Handle function calls
             if response_message.tool_calls:
                 for tool_call in response_message.tool_calls:
-                    if tool_call.function.name == {"web_search","get_current_weather","get_forecast_weather"}:
-                        function_args = json.loads(tool_call.function.arguments)
-                        function_response = await openai_function_manager.call_function(tool_call.function.name, arguments)
-                        web_response = bing_search(function_args["query"])
-                        # logger.info(f"get web response:{web_response}") (request_content, function_name, content,tool_call_id=None,arguments=None)
+                    if tool_call.function.name :
+                        function_args = tool_call.function.arguments
+                        function_response = await openai_function_manager.call_function(tool_call.function.name, function_args)
+                        # logger.info(f"get function {tool_call.function.name} response message:{function_response}")
                         request_content = add_function_call_to_request(request_content=request_content, 
-                            function_name=tool_call.function.name,content=function_response,tool_call_id=tool_call.id,arguments=function_args["query"])
+                            function_name=tool_call.function.name,content=function_response,tool_call_id=tool_call.id,arguments=function_args)
         elif _openai_provider == "openai":
-            function = {
-                        "name": "web_search",
-                        "description": "Execute a web search for the given query and return a list of results",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "query": {
-                                    "type": "string",
-                                    "description": "the user query",
-                                },
-                            },
-                            "required": ["query"],
-                        },
-                    }
             response = await client.chat.completions.create(
                 model=_model,
                 messages=[{"role":"user","content":message}],
-                functions=function,
+                functions=openai_function_manager.get_functions_specs(),
                 function_call="auto",
             )
             # Process the model's response
@@ -144,15 +95,12 @@ async def chatgpt(wxid: str, message: str):  # 这个函数请求了openai的api
             # Handle function calls
             if response_message.function_call:
                 for tool_call in response_message.function_call:
-                    if tool_call.name == "web_search":
-                        function_args = json.loads(tool_call.arguments)
-                        web_response = bing_search(function_args["query"])
+                    if tool_call.name:
+                        function_args = tool_call.arguments
+                        function_response = await openai_function_manager.call_function(tool_call.name, function_args)
                         # logger.info(f"get web response:{web_response}")
-                        request_content.append({
-                            "role": "function",
-                            "name": "web_search",
-                            "content": json.dumps(web_response),
-                        })
+                        request_content = add_function_call_to_request(request_content=request_content, 
+                            function_name=tool_call.name,content=function_response,arguments=function_args)
         else:
             request_content = compose_gpt_dialogue_request_content(wxid, message)
         logger.info(f"final requests:{request_content}")
@@ -224,9 +172,9 @@ def add_function_call_to_request(request_content, function_name, content,tool_ca
     Adds a function call to the request
     """
     if _openai_provider == "azure":
-        request_content.append({"role": "assistant", 'tool_calls': [{'id': tool_call.id, 'function': {'arguments': arguments, 'name':  function_name}, 'type': 'function'}]})
+        request_content.append({"role": "assistant", 'tool_calls': [{'id': tool_call_id, 'function': {'arguments': arguments, 'name':  function_name}, 'type': 'function'}]})
         request_content.append({
-            "tool_call_id": tool_call.id,
+            "tool_call_id": tool_call_id,
             "role": "tool",
             "name": function_name,
             "content": content,

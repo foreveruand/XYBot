@@ -1,4 +1,4 @@
-import os
+import config.config as CONFIG
 from itertools import islice
 from typing import Dict
 import requests
@@ -10,7 +10,7 @@ class BINGWebSearchPlugin(Plugin):
     A plugin to search the web for a given query, using Bing
     """
     def __init__(self):
-        self.subscription_key = os.getenv('BING_API_KEY', '')
+        self.subscription_key = CONFIG.BING_API_KEY
 
     def get_source_name(self) -> str:
         return "Bing"
@@ -31,7 +31,7 @@ class BINGWebSearchPlugin(Plugin):
             },
         }]
 
-    async def execute(self, function_name, helper, **kwargs) -> Dict:
+    async def execute(self, function_name, **kwargs) -> Dict:
         endpoint = "https://api.bing.microsoft.com" + "/v7.0/search"
         # Construct a request
         mkt = 'zh-CN'
