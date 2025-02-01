@@ -61,10 +61,14 @@ class gpt(PluginInterface):
                         await self.send_friend_or_group(bot, recv, out_message)
                         return
                 if recv.content[1] == "修改模型" :
-                    if recv.content[2] in CONFIG.OPENAI_PROVIDER_LIST and recv.content[3] in CONFIG.GPT_VERSION_LIST[recv.content[2]]:  # 如果是清除对话记录的关键词，清除数据库对话记录
+                    if user_wxid in self.admins and recv.content[2] in CONFIG.OPENAI_PROVIDER_LIST and recv.content[3] in CONFIG.GPT_VERSION_LIST[recv.content[2]]:  # 管理员修改模型
                         try:
                             update_config(recv.content[2],recv.content[3])
-                            out_message = "模型已修改"
+                            if recv.from_group():
+                                clear_dialogue(recv.roomid)  # 保存清除了的数据到数据库
+                            else :
+                                clear_dialogue(user_wxid)  # 保存清除了的数据到数据库
+                            out_message = "模型已修改，对话记录已清除"
                         except:
                             out_message = "修改出错"
                         await self.send_friend_or_group(bot, recv, out_message)
