@@ -7,12 +7,12 @@ import base64
 from mimetypes import guess_type
 from loguru import logger
 from .openai_plugin_manager import plugin_manager as openai_function_manager
-import requests
+import tiktoken
 import json
 
 _openai_provider = CONFIG.OPENAI_PROVIDER
 _model = CONFIG.GPT_VERSION
-
+_max_tokens = CONFIG.MAX_TOKENS
 def update_config(provider, model):
     global _openai_provider, _model
     _openai_provider = provider
@@ -30,17 +30,27 @@ def update_config(provider, model):
     with open(file_path, 'w') as file:    
         file.writelines(lines)
 
-def compose_gpt_dialogue_request_content(wxid: str, new_message: str) -> list:
+async def compose_gpt_dialogue_request_content(wxid: str, new_message: str) -> list:
     db = BotDatabase()
     json_data = db.get_private_gpt_data(wxid)  # 从数据库获得到之前的对话
-
+    request_content = []
     if not json_data or "data" not in json_data.keys():  # 如果没有对话数据，则初始化
         init_data = {"data": []}
         json_data = init_data
-    request_content = [{"role": "system", "content": "Please try to keep your response concise, ideally within 50 words."}]
-    
-    previous_dialogue = json_data['data'][CONFIG.DIALOGUE_COUNT * -2:]  # 获取指定轮数的对话，乘-2是因为一轮对话包含了1个请求和1个答复
-    request_content += previous_dialogue  # 将之前的对话加入到api请求内容中
+        request_content = [{"role": "system", "content": "Please try to keep your response concise, ideally within 50 words."}]
+
+    previous_dialogue = json_data['data']  # 获取指定轮数的对话，乘-2是因为一轮对话包含了1个请求和1个答复
+    token_count= count_tokens(previous_dialogue)
+    if token_count > _max_tokens:
+        logger.info("Token count exceeds the limit, summarizing the conversation")
+        summary = await summarise(previous_dialogue)
+        request_content = [{"role": "system", "content": "Please try to keep your response concise, ideally within 50 words."}]
+        request_content.append({"role": "assistant", "content": summary})
+        json_data = {"data": request_content}  # 构成保存需要的json数据
+        db=BotDatabase()
+        db.save_private_gpt_data(wxid, json_data)
+    else:
+        request_content += previous_dialogue  # 将之前的对话加入到api请求内容中
 
     request_content.append({"role": "user", "content": new_message})  # 将用户新的问题加入api请求内容
 
@@ -72,7 +82,7 @@ async def chatgpt(wxid: str, message: str):  # 这个函数请求了openai的api
             # logger.info(f"send request with tool:{openai_function_manager.get_functions_specs('azure')}")
             # Process the model's response
             response_message = response.choices[0].message
-            request_content = compose_gpt_dialogue_request_content(wxid, message)
+            request_content = await compose_gpt_dialogue_request_content(wxid, message)
             # Handle function calls
             if response_message.tool_calls:
                 for tool_call in response_message.tool_calls:
@@ -91,7 +101,7 @@ async def chatgpt(wxid: str, message: str):  # 这个函数请求了openai的api
             )
             # Process the model's response
             response_message = response.choices[0].message
-            request_content = compose_gpt_dialogue_request_content(wxid, message)
+            request_content = await compose_gpt_dialogue_request_content(wxid, message)
             # Handle function calls
             if response_message.function_call:
                 for tool_call in response_message.function_call:
@@ -102,7 +112,7 @@ async def chatgpt(wxid: str, message: str):  # 这个函数请求了openai的api
                         request_content = add_function_call_to_request(request_content=request_content, 
                             function_name=tool_call.name,content=function_response,arguments=function_args)
         else:
-            request_content = compose_gpt_dialogue_request_content(wxid, message)
+            request_content = await compose_gpt_dialogue_request_content(wxid, message)
         logger.info(f"final requests:{request_content}")
         chat_completion = await client.chat.completions.create(
             messages=request_content,
@@ -132,7 +142,7 @@ async def chatgpt_img(wxid:str, image_path: str, message: str = "Describe this p
     # Construct the data URL
     # return f"data:{mime_type};base64,{base64_encoded_data}"
 
-    request_content = compose_gpt_dialogue_request_content(wxid, message)  # 构成对话请求内容，返回一个包含之前对话的列表
+    request_content = await compose_gpt_dialogue_request_content(wxid, message)  # 构成对话请求内容，返回一个包含之前对话的列表
     request_content.append({"type": "image_url","image_url": {"url": "data:image/jpeg;base64,{base64_encoded_data}"}})
 
     if _openai_provider == "azure" :
@@ -159,9 +169,9 @@ async def chatgpt_img(wxid:str, image_path: str, message: str = "Describe this p
 
 def save_gpt_dialogue_request_content(wxid: str, request_content: list, gpt_response: str) -> None:
     request_content = [msg for msg in request_content if isinstance(msg, dict) ]
-    logger.debug(f"save request:{str(request_content)};\nresponse:{gpt_response}")
+    # logger.debug(f"save request:{str(request_content)};\nresponse:{gpt_response}")
     request_content.append({"role": "assistant", "content": gpt_response})  # 将gpt回答加入到api请求内容
-    request_content = request_content[CONFIG.DIALOGUE_COUNT * -2:]  # 将列表切片以符合指定的对话轮数，乘-2是因为一轮对话包含了1个请求和1个答复
+    # request_content = request_content[CONFIG.DIALOGUE_COUNT * -2:]  # 将列表切片以符合指定的对话轮数，乘-2是因为一轮对话包含了1个请求和1个答复
 
     json_data = {"data": request_content}  # 构成保存需要的json数据
     db=BotDatabase()
@@ -197,7 +207,74 @@ def senstitive_word_check(message):  # 检查敏感词
             return False
     return True
 
+async def summarise(conversation) -> str:
+    """
+    Summarises the conversation history.
+    :param conversation: The conversation history
+    :return: The summary
+    """
+    messages = [
+        {"role": "system", "content": "Summarize this conversation in 700 characters or less"}
+    ] + conversation
+    if _openai_provider == "azure" :
+        client = AsyncAzureOpenAI(
+            api_key=CONFIG.OPENAI_API_KEY,
+            azure_endpoint=CONFIG.OPENAI_API_BASE,
+            api_version="2024-07-01-preview",
+        )
+    elif _openai_provider == "workers":
+        client = AsyncOpenAI(
+            api_key= CONFIG.CLOUDFLARE_API_KEY,
+            base_url= f"https://api.cloudflare.com/client/v4/accounts/{CONFIG.CLOUDFLARE_ACCOUNT_ID}/ai/v1"
+        )
+    else :
+        client = AsyncOpenAI(api_key=CONFIG.DEEPSEEK_API_KEY, base_url=CONFIG.DEEPSEEK_API_BASE)
+    response = await client.chat.completions.create(
+        model=_model,
+        messages=messages,
+        temperature=0.4,
+    )
+    return response.choices[0].message.content
+def count_tokens(messages) -> int:
+    """
+    Counts the number of tokens required to send the given messages.
+    :param messages: the messages to send
+    :return: the number of tokens required
+    """
+    model = _model
+    try:
+        encoding = tiktoken.encoding_for_model(model)
+    except KeyError:
+        encoding = tiktoken.get_encoding("o200k_base")
 
+    tokens_per_message = 3
+    tokens_per_name = 1
+    num_tokens = 0
+    for message in messages:
+        num_tokens += tokens_per_message
+        for key, value in message.items():
+            if key == 'content':
+                if isinstance(value, str):
+                    num_tokens += len(encoding.encode(value))
+                else:
+                    for message1 in value:
+                        if message1['type'] == 'image_url':
+                            pass
+                        else:
+                            num_tokens += len(encoding.encode(message1['text']))
+            else:
+                try:
+                    num_tokens += len(encoding.encode(value))
+                except:
+                    value_str = json.dumps(value)
+                    try:
+                        num_tokens += len(encoding.encode(value_str))
+                    except:
+                        pass
+                if key == "name":
+                    num_tokens += tokens_per_name
+    num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
+    return num_tokens
 def clear_dialogue(wxid):  # 清除对话记录
     db=BotDatabase()
     db.save_private_gpt_data(wxid, {"data": []})

@@ -1,3 +1,5 @@
+### 2025.02.01
+[telegram-chatgpt-bot](https://github.com/n3d1117/chatgpt-telegram-bot) 抄了openai function manager
 ---
 ### 2024.11.18 更新
 [nonebot-plugin-handle](https://github.com/noneplugin/nonebot-plugin-handle) 抄了过来

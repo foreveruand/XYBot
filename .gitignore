@@ -175,3 +175,5 @@ config/config.py
 resources/cache/*
 sensitive_words.yml
 main_config.yml
+resources/bilichat/font/.lock
+wcferry_helper/logs/wcf.txt
