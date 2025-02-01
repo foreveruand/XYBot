@@ -13,7 +13,7 @@ from utils.database import BotDatabase
 from utils.plugin_interface import PluginInterface
 import config.config as CONFIG
 from wcferry_helper import XYBotWxMsg
-from utils.openai import chatgpt, chatgpt_bing, senstitive_word_check, clear_dialogue
+from utils.openai import chatgpt, senstitive_word_check, clear_dialogue, update_config
 
 class gpt(PluginInterface):
     def __init__(self):
@@ -63,33 +63,16 @@ class gpt(PluginInterface):
                 if recv.content[1] == "修改模型" :
                     if recv.content[2] in CONFIG.OPENAI_PROVIDER_LIST and recv.content[3] in CONFIG.GPT_VERSION_LIST[recv.content[2]]:  # 如果是清除对话记录的关键词，清除数据库对话记录
                         try:
-                            file_path = 'config/config.py'
-                            CONFIG.OPENAI_PROVIDER=recv.content[2]
-                            CONFIG.GPT_VERSION=recv.content[3]
-                            with open(file_path, 'r') as file:
-                                lines = file.readlines()
-                            for i, line in enumerate(lines):
-                                if line.startswith('OPENAI_PROVIDER='):
-                                    lines[i] = f'OPENAI_PROVIDER=\"{recv.content[2]}\"\n'
-                                elif line.startswith('GPT_VERSION='):
-                                    lines[i] = f'GPT_VERSION=\"{recv.content[3]}\"\n'
-                            with open(file_path, 'w') as file:    
-                                file.writelines(lines)
+                            update_config(recv.content[2],recv.content[3])
                             out_message = "模型已修改"
                         except:
                             out_message = "修改出错"
                         await self.send_friend_or_group(bot, recv, out_message)
                         return
                 if recv.from_group():
-                    if recv.content[0]=="bing":
-                        chatgpt_answer = await chatgpt_bing(recv.roomid, gpt_request_message)
-                    else:
-                        chatgpt_answer = await chatgpt(recv.roomid, gpt_request_message)   # 从chatgpt api 获取回答
+                    chatgpt_answer = await chatgpt(recv.roomid, gpt_request_message)   # 从chatgpt api 获取回答
                 else :
-                    if recv.content[0]=="bing":
-                        chatgpt_answer = await chatgpt_bing(recv.roomid, gpt_request_message)
-                    else:
-                        chatgpt_answer = await chatgpt(recv.roomid, gpt_request_message)   # 从chatgpt api 获取回答
+                    chatgpt_answer = await chatgpt(recv.roomid, gpt_request_message)   # 从chatgpt api 获取回答
                 if chatgpt_answer[0]:
                     # out_message = f"{chatgpt_answer[1]}\nChatGPT版本：{self.gpt_version}"  # 创建信息
                     out_message = f"{chatgpt_answer[1]}"  # 创建信息
