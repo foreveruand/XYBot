@@ -6,7 +6,7 @@ import yaml
 import base64
 from mimetypes import guess_type
 from loguru import logger
-from openai_plugin_manager import plugin_manager as openai_function_manager
+from .openai_plugin_manager import plugin_manager as openai_function_manager
 import requests
 import json
 

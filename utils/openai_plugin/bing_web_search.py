@@ -2,7 +2,7 @@ import os
 from itertools import islice
 from typing import Dict
 import requests
-from .openai_plugin import Plugin
+from .plugin import Plugin
 from loguru import logger as logging
 
 class BINGWebSearchPlugin(Plugin):

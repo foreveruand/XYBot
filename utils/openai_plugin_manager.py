@@ -1,5 +1,5 @@
 import json
-
+import yaml
 # from openai_plugin.gtts_text_to_speech import GTTSTextToSpeech
 # from openai_plugin.auto_tts import AutoTextToSpeech
 # from openai_plugin.dice import DicePlugin
@@ -9,7 +9,7 @@ import json
 # from openai_plugin.crypto import CryptoPlugin
 # from openai_plugin.weather import WeatherPlugin
 # from openai_plugin.ddg_web_search import DDGWebSearchPlugin
-from openai_plugin.bing_web_search import BINGWebSearchPlugin
+from .openai_plugin.bing_web_search import BINGWebSearchPlugin
 # from openai_plugin.wolfram_alpha import WolframAlphaPlugin
 # from openai_plugin.deepl import DeeplTranslatePlugin
 # from openai_plugin.worldtimeapi import WorldTimeApiPlugin
