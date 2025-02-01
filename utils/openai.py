@@ -96,7 +96,7 @@ async def chatgpt(wxid: str, message: str):  # 这个函数请求了openai的api
         client = AsyncOpenAI(api_key=CONFIG.DEEPSEEK_API_KEY, base_url=CONFIG.DEEPSEEK_API_BASE)
         logger.info(f"send request to deepseek: {_openai_provider} with model {_model} to {CONFIG.DEEPSEEK_API_BASE}")
     try:
-        if _openai_provider == "azure" :
+        if _openai_provider == "azure":
             tools = [
                 {
                     "type": "function",
@@ -139,7 +139,7 @@ async def chatgpt(wxid: str, message: str):  # 这个函数请求了openai的api
                             "name": "web_search",
                             "content": json.dumps(web_response),
                         })
-        else:
+        elif _openai_provider == "openai":
             function = {
                         "name": "web_search",
                         "description": "Execute a web search for the given query and return a list of results",
@@ -175,7 +175,8 @@ async def chatgpt(wxid: str, message: str):  # 这个函数请求了openai的api
                             "name": "web_search",
                             "content": json.dumps(web_response),
                         })
-            # request_content = compose_gpt_dialogue_request_content(wxid, message)
+        else:
+            request_content = compose_gpt_dialogue_request_content(wxid, message)
         logger.info(f"final requests:{request_content}")
         chat_completion = await client.chat.completions.create(
             messages=request_content,
