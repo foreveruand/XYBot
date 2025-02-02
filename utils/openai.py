@@ -12,7 +12,7 @@ import json
 
 _openai_provider = CONFIG.OPENAI_PROVIDER
 _model = CONFIG.GPT_VERSION
-_max_tokens = CONFIG.MAX_TOKENS
+_max_dialogue_tokens = CONFIG.MAX_DIALOGUE_TOKENS
 def update_config(provider, model):
     global _openai_provider, _model
     _openai_provider = provider
@@ -37,14 +37,14 @@ async def compose_gpt_dialogue_request_content(wxid: str, new_message: str) -> l
     if not json_data or "data" not in json_data.keys():  # 如果没有对话数据，则初始化
         init_data = {"data": []}
         json_data = init_data
-        request_content = [{"role": "system", "content": "Please try to keep your response concise, ideally within 50 words."}]
+        request_content = [{"role": "system", "content": "Please try to keep your response concise, in 75 words or less"}]
 
     previous_dialogue = json_data['data']  # 获取指定轮数的对话，乘-2是因为一轮对话包含了1个请求和1个答复
     token_count= count_tokens(previous_dialogue)
-    if token_count > _max_tokens:
+    if token_count > _max_dialogue_tokens:  # 如果对话token数超过限制，则进行对话总结
         logger.info("Token count exceeds the limit, summarizing the conversation")
         summary = await summarise(previous_dialogue)
-        request_content = [{"role": "system", "content": "Please try to keep your response concise, ideally within 50 words."}]
+        request_content = [{"role": "system", "content": "Please try to keep your response concise, in 75 words or less"}]
         request_content.append({"role": "assistant", "content": summary})
         json_data = {"data": request_content}  # 构成保存需要的json数据
         db=BotDatabase()

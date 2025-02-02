@@ -1,19 +1,41 @@
 #  Copyright (c) 2024. Henry Yang
 #
 #  This program is licensed under the GNU General Public License v3.0.
-
-import asyncio
-from datetime import datetime
 import random
-import pytz
-import requests
-import schedule
 import yaml
 from loguru import logger
 from wcferry import client
-
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Union
+import asyncio
+import schedule
 from utils.plans_interface import PlansInterface
-from utils.eat import *
+try:
+    import ujson as json
+except ModuleNotFoundError:
+    import json
+    
+class Meals(Enum):
+    BREAKFAST = ["breakfast", "早餐", "早饭"]
+    LUNCH = ["lunch", "午餐", "午饭", "中餐"]
+    SNACK = ["snack", "摸鱼", "下午茶", "饮茶"]
+    DINNER = ["dinner", "晚餐", "晚饭"]
+    MIDNIGHT = ["midnight", "夜宵", "宵夜"]
+
+class SearchLoc(Enum):
+    IN_BASIC = "In basic"
+    IN_GROUP = "In group"
+    IN_GLOBAL = "In global"
+
+def save_json(_file: Path, _data: Any) -> None:
+    with open(_file, 'w', encoding='utf-8') as f:
+        json.dump(_data, f, ensure_ascii=False, indent=4)
+
+
+def load_json(_file: Path) -> Any:
+    with open(_file, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
 class eating_remind(PlansInterface):
     def __init__(self):
@@ -36,7 +58,7 @@ class eating_remind(PlansInterface):
                 try:
                     bot.send_text(msg, gid)
                     logger.info(f"已群发{meal.value[1]}提醒")
-                except ActionFailed as e:
+                except Exception as e:
                     logger.warning(f"发送群 {gid} 失败：{e}")
 
     def _get_greeting(self, meal: Meals) -> str:

@@ -51,7 +51,7 @@ class BINGWebSearchPlugin(Plugin):
 
         def to_metadata(result: Dict) -> Dict[str, str]:
             return {
-                "snippet": result["snippet"],
+                "snippet": result["snippet"][:100],
                 "link": result["url"],
             }
         logging.info({"result": [to_metadata(result) for result in results]})    
