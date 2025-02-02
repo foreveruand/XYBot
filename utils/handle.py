@@ -8,7 +8,10 @@ from PIL.Image import Image as IMG
 from PIL.ImageFont import FreeTypeFont
 from pypinyin import Style, pinyin
 
-resource_dir = Path(__file__).parent / "handle"
+resource_dir = Path(__file__).parents[1] / "resources" / "handle"
+if not resource_dir.exists():
+    # 创建必要的目录结构
+    resource_dir.mkdir(parents=True, exist_ok=True)
 fonts_dir = resource_dir / "fonts"
 data_dir = resource_dir / "data"
 idiom_path = data_dir / "idioms.txt"

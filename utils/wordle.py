@@ -8,9 +8,12 @@ from PIL.Image import Image as IMG
 from PIL.ImageFont import FreeTypeFont
 from pypinyin import Style, pinyin
 from spellchecker import SpellChecker
-data_dir = Path(__file__).parent / "wordle"
-fonts_dir = data_dir / "fonts"
-words_dir = data_dir / "words"
+resource_dir = Path(__file__).parents[1] / "resources" / "wordle"
+if not resource_dir.exists():
+    # 创建必要的目录结构
+    resource_dir.mkdir(parents=True, exist_ok=True)
+fonts_dir = resource_dir / "fonts"
+words_dir = resource_dir / "words"
 
 dic_list = [f.stem for f in words_dir.iterdir() if f.suffix == ".json"]
 
