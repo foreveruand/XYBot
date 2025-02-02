@@ -119,7 +119,7 @@ async def chatgpt(wxid: str, message: str):  # 这个函数请求了openai的api
             model=_model,
             temperature=CONFIG.TEMPERATURE,
             max_tokens=CONFIG.MAX_TOKENS,
-            timeout=5.0,
+            timeout=30.0,
             stream=False
         )  # 调用openai api
         logger.info(f"final response:{chat_completion.choices[0]}")

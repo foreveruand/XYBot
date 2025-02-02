@@ -6,6 +6,7 @@ import re
 import os
 import yaml
 import time
+from cachetools import TTLCache
 import asyncio
 import glob
 from asyncio import TimerHandle
@@ -24,7 +25,7 @@ from utils.handle import random_idiom
 
 from utils.plugin_interface import PluginInterface
 from wcferry_helper import XYBotWxMsg
-
+hint_cache = TTLCache(maxsize=100, ttl=3)
 games: dict[str, Handle] = {}
 timers: dict[str, TimerHandle] = {}
 last_hint = 0
@@ -106,19 +107,25 @@ class handle(PluginInterface):
                 await self.send_friend_or_group(bot, recv, "猜成语结束")
                 return
             if recv.content[0]=='提示':
-                global last_hint
-                if time.time() - last_hint >= 3:
-                    time_change=time.time() - last_hint
-                    logger.info(f"当前时间{time.time()},距离上次提示时间{last_hint}为{time_change}")
-                    last_hint = time.time()
+                hint_key = (recv.content[0], room_id)
+                if hint_key in hint_cache:
+                    logger.info(f"距离上次提示时间过短，忽略")
+                    return
+                # global last_hint
+                # if time.time() - last_hint >= 3:
+                else:
+                    hint_cache[hint_key] = time.time()
+                    # time_change=time.time() - last_hint
+                    # logger.info(f"当前时间{time.time()},距离上次提示时间{last_hint}为{time_change}")
+                    # last_hint = time.time()
                     # self.set_timeout(bot, room_id, recv)
                     raw=await run_sync(game.draw_hint)()
                     save_path = os.path.abspath(f"resources/cache/handle_{time.time_ns()}.png")
                     with open(save_path, 'wb') as f:
                         f.write(raw.getvalue())
                     await self.send_friend_or_group_image(bot, recv, save_path)
-                else:
-                    logger.info(f"距离上次提示时间{last_hint}过短，忽略")
+                # else:
+                #     logger.info(f"距离上次提示时间{last_hint}过短，忽略")
                 # save_path = os.path.abspath(get_latest_file("resources/cache/handle_*"))
                 # # logger.debug(f"最新文件地址:{save_path}")
                 # await self.send_friend_or_group_image(bot, recv, save_path)
