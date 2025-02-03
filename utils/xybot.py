@@ -191,3 +191,18 @@ class XYBot:
 
         else:
             logger.error("未知的屏蔽模式！请检查白名单/黑名单设置！")
+async def send_friend_or_group(db: BotDatabase, bot: client.Wcf, recv: XYBotWxMsg, out_message="null"):
+    if recv.from_group():  # 判断是群还是私聊
+        out_message = f"@{db.get_nickname(recv.sender)}：{out_message}"
+        logger.info(f'[发送@信息]{out_message}| [发送到] {recv.roomid}')
+        # bot.send_text(out_message, recv.roomid, recv.sender)  # 发送@信息
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, bot.send_text, out_message, recv.roomid, recv.sender)
+    else:
+        logger.info(f'[发送信息]{out_message}| [发送到] {recv.roomid}')
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, bot.send_text, out_message, recv.roomid)
+
+async def send_friend_or_group_image(bot: client.Wcf, recv: XYBotWxMsg, image_path: str):
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, bot.send_image, image_path, recv.roomid)

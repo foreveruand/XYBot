@@ -25,6 +25,7 @@ from utils.handle import random_idiom
 
 from utils.plugin_interface import PluginInterface
 from wcferry_helper import XYBotWxMsg
+from utils.xybot import send_friend_or_group, send_friend_or_group_image
 hint_cache = TTLCache(maxsize=100, ttl=3)
 games: dict[str, Handle] = {}
 timers: dict[str, TimerHandle] = {}
@@ -51,7 +52,7 @@ class handle(PluginInterface):
             msg = "猜成语超时，游戏结束。"
             if len(game.guessed_idiom) >= 1:
                 msg += f"\n{str(game.result)}"
-            await self.send_friend_or_group(bot, recv, msg)
+            await send_friend_or_group(self.db, bot, recv, msg)
 
     def set_timeout(self, bot: client.Wcf, room_id: str, recv: XYBotWxMsg ,timeout: float = 300):
         logger.debug(f"handle :设置超时时间")
@@ -99,36 +100,24 @@ class handle(PluginInterface):
             save_path = os.path.abspath(f"resources/cache/handle_{time.time_ns()}.png")
             with open(save_path, 'wb') as f:
                 f.write(raw.getvalue())
-            await self.send_friend_or_group(bot, recv, msg)
-            # await self.send_friend_or_group_image(bot, recv, save_path)
+            await send_friend_or_group(self.db, bot, recv, msg)
         elif game:
             if recv.content[0]=='结束':
                 self.stop_game(room_id)
-                await self.send_friend_or_group(bot, recv, "猜成语结束")
+                await send_friend_or_group(self.db, bot, recv, "猜成语结束")
                 return
             if recv.content[0]=='提示':
                 hint_key = (recv.content[0], room_id)
                 if hint_key in hint_cache:
                     logger.info(f"距离上次提示时间过短，忽略")
                     return
-                # global last_hint
-                # if time.time() - last_hint >= 3:
                 else:
                     hint_cache[hint_key] = time.time()
-                    # time_change=time.time() - last_hint
-                    # logger.info(f"当前时间{time.time()},距离上次提示时间{last_hint}为{time_change}")
-                    # last_hint = time.time()
-                    # self.set_timeout(bot, room_id, recv)
                     raw=await run_sync(game.draw_hint)()
                     save_path = os.path.abspath(f"resources/cache/handle_{time.time_ns()}.png")
                     with open(save_path, 'wb') as f:
                         f.write(raw.getvalue())
-                    await self.send_friend_or_group_image(bot, recv, save_path)
-                # else:
-                #     logger.info(f"距离上次提示时间{last_hint}过短，忽略")
-                # save_path = os.path.abspath(get_latest_file("resources/cache/handle_*"))
-                # # logger.debug(f"最新文件地址:{save_path}")
-                # await self.send_friend_or_group_image(bot, recv, save_path)
+                    await send_friend_or_group_image(bot, recv, save_path)
                 return
             if not (re.fullmatch(r'^[\u4e00-\u9fa5]{4}$', recv.content[0])):
                 logger.debug("非四字词语，跳过")
@@ -148,8 +137,8 @@ class handle(PluginInterface):
                 save_path = os.path.abspath(f"resources/cache/handle_{time.time_ns()}.png")
                 with open(save_path, 'wb') as f:
                     f.write(raw.getvalue())
-                await self.send_friend_or_group( bot, recv, msg)
-                await self.send_friend_or_group_image(bot, recv, save_path)
+                await send_friend_or_group(self.db, bot, recv, msg)
+                await send_friend_or_group_image(bot, recv, save_path)
 
             elif result == GuessResult.DUPLICATE:
                 return
@@ -159,27 +148,16 @@ class handle(PluginInterface):
                 # await self.send_friend_or_group( bot, recv, "你已经猜过这个成语了呢")
 
             elif result == GuessResult.ILLEGAL:
-                await self.send_friend_or_group( bot, recv, f"你确定“{idiom}”是个成语吗？")
+                await send_friend_or_group(self.db, bot, recv, f"你确定“{idiom}”是个成语吗？")
 
             else:
                 raw=await run_sync(game.draw)()
                 save_path = os.path.abspath(f"resources/cache/handle_{time.time_ns()}.png")
                 with open(save_path, 'wb') as f:
                     f.write(raw.getvalue())
-                await self.send_friend_or_group_image(bot, recv, save_path)
+                await send_friend_or_group_image(bot, recv, save_path)
 
-    async def send_friend_or_group(self, bot: client.Wcf, recv: XYBotWxMsg, out_message="null"):
-        if recv.from_group():  # 判断是群还是私聊
-            out_message = f"@{self.db.get_nickname(recv.sender)}\n{out_message}"
-            logger.info(f'[发送@信息]{out_message}| [发送到] {recv.roomid}')
-            bot.send_text(out_message, recv.roomid, recv.sender)  # 发送@信息
 
-        else:
-            logger.info(f'[发送信息]{out_message}| [发送到] {recv.roomid}')
-            bot.send_text(out_message, recv.roomid)  # 发送
-
-    async def send_friend_or_group_image(self, bot: client.Wcf, recv: XYBotWxMsg, image_path: str):
-        bot.send_image(image_path, recv.roomid)
 P = ParamSpec("P")
 R = TypeVar("R")
 

@@ -3,7 +3,7 @@
 #  This program is licensed under the GNU General Public License v3.0.
 
 import re
-
+import asyncio
 import yaml
 from loguru import logger
 from openai import AsyncOpenAI,AzureOpenAI
@@ -14,6 +14,7 @@ from utils.plugin_interface import PluginInterface
 import config.config as CONFIG
 from wcferry_helper import XYBotWxMsg
 from utils.openai import chatgpt, senstitive_word_check, clear_dialogue, update_config
+from utils.xybot import send_friend_or_group
 
 class gpt(PluginInterface):
     def __init__(self):
@@ -58,7 +59,7 @@ class gpt(PluginInterface):
                         else :
                             clear_dialogue(user_wxid)  # 保存清除了的数据到数据库
                         out_message = "对话记录已清除！✅"
-                        await self.send_friend_or_group(bot, recv, out_message)
+                        await send_friend_or_group(self.db, bot, recv, out_message)
                         return
                 if recv.content[1] == "修改模型" :
                     if user_wxid in self.admins and recv.content[2] in CONFIG.OPENAI_PROVIDER_LIST and recv.content[3] in CONFIG.GPT_VERSION_LIST[recv.content[2]]:  # 管理员修改模型
@@ -71,7 +72,7 @@ class gpt(PluginInterface):
                             out_message = "模型已修改，对话记录已清除"
                         except:
                             out_message = "修改出错"
-                        await self.send_friend_or_group(bot, recv, out_message)
+                        await send_friend_or_group(self.db, bot, recv, out_message)
                         return
                 if recv.from_group():
                     chatgpt_answer = await chatgpt(recv.roomid, gpt_request_message)   # 从chatgpt api 获取回答
@@ -82,23 +83,9 @@ class gpt(PluginInterface):
                     out_message = f"{chatgpt_answer[1]}"  # 创建信息
                 else:
                     out_message = f"出现错误！⚠️{chatgpt_answer}"
-                await self.send_friend_or_group(bot, recv, out_message)
+                await send_friend_or_group(self.db, bot, recv, out_message)
 
         else:
-            await self.send_friend_or_group(bot, recv, error_message)
+            await send_friend_or_group(self.db, bot, recv, error_message)
 
-    # def senstitive_word_check(self, message):  # 检查敏感词
-    #     for word in self.sensitive_words:
-    #         if word in message:
-    #             return False
-    #     return True
 
-    async def send_friend_or_group(self, bot: client.Wcf, recv: XYBotWxMsg, out_message="null"):
-        if recv.from_group():  # 判断是群还是私聊
-            out_message = f"@{self.db.get_nickname(recv.sender)}\n{out_message}"
-            logger.info(f'[发送@信息]{out_message}| [发送到] {recv.roomid}')
-            bot.send_text(out_message, recv.roomid, recv.sender)  # 发送@信息
-
-        else:
-            logger.info(f'[发送信息]{out_message}| [发送到] {recv.roomid}')
-            bot.send_text(out_message, recv.roomid)  # 发送
